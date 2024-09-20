@@ -1,0 +1,61 @@
+namespace cdm.regulation.ofr : <"OFR Reporting Model">
+version "${project.version}"
+
+import cdm.base.*
+import cdm.base.datetime.*
+import cdm.base.staticdata.party.*
+import cdm.base.staticdata.identifier.*
+import cdm.base.staticdata.asset.common.*
+
+import cdm.observable.asset.*
+import cdm.observable.common.*
+import cdm.observable.event.*
+import cdm.product.template.*
+import cdm.product.asset.*
+import cdm.product.common.schedule.*
+import cdm.product.common.settlement.*
+
+import cdm.legaldocumentation.common.*
+import cdm.legaldocumentation.master.*
+
+import cdm.event.*
+import cdm.event.workflow.*
+import cdm.event.position.*
+import cdm.event.common.*
+import cdm.mapping.config.*
+
+type OfrReport:
+    fileObservationDate string (0..1)
+    coveredReporterLEI string (0..1)
+    cashLenderLEI string (0..1)
+    cashLenderName string (0..1)
+    cashBorrowerName string (0..1)
+    cashBorrowerLEI string (0..1)
+    guarantee string (0..1)
+    transactionID string (0..1)
+    uniqueTransactionID string (0..1)
+    tradingPlatform string (0..1)
+    tradeTimestamp string (0..1)
+    startDate string (0..1)
+    endDate string (0..1)
+    minimumMaturityDate string (0..1)
+    cashLenderInternalIdentifier string (0..1)
+    cashBorrowerInternalIdentifier string (0..1)
+    startLegAmount string (0..1)
+    closeLegAmount string (0..1)
+    currentCashAmount string (0..1)
+    startLegCurrency string (0..1)
+    rate string (0..1)
+    floatingRateBenchmark string (0..1)
+    floatingRateResetFrequency string (0..1)
+    spread string (0..1)
+    securitiesIdentifierType string (0..1)
+    securityIdentifier string (0..1)
+    securitiesQuantity string (0..1)
+    securitiesValue string (0..1)
+    securitiesValueatInception string (0..1)
+    securitiesValueCurrency string (0..1)
+    haircut string (0..1)
+    specialInstructionsNotesorComments string (0..1)
+	
+

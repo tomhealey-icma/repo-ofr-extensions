@@ -1,0 +1,2 @@
+namespace cdm.regulation.ofr : <"OFR Reporting Model">
+version "${project.version}"

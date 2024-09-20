@@ -1,0 +1,241 @@
+namespace cdm.regulation.ofr : <"OFR Reporting Model">
+version "${project.version}"
+
+import cdm.base.*
+import cdm.base.math.*
+import cdm.base.datetime.*
+import cdm.base.staticdata.party.*
+import cdm.base.staticdata.asset.common.*
+import cdm.base.staticdata.asset.rates.*
+import cdm.base.staticdata.identifier.*
+import cdm.base.staticdata.common.*
+
+import cdm.observable.asset.*
+import cdm.observable.event.*
+
+import cdm.product.common.*
+import cdm.product.asset.*
+import cdm.product.template.*
+import cdm.product.common.settlement.*
+
+import cdm.legaldocumentation.master.*
+import cdm.legaldocumentation.common.*
+import cdm.product.collateral.*
+
+import cdm.event.workflow.*
+import cdm.event.position.*
+import cdm.event.common.*
+import cdm.product.qualification.*
+
+import cdm.product.repo.ext.common.*
+import cdm.product.repo.ext.trade.*
+import cdm.product.repo.ext.collateral.*
+import cdm.product.repo.ext.product.*
+import cdm.product.repo.ext.datetime.*
+import cdm.product.repo.ext.parties.*
+
+		
+func Create_OfrReport:
+	inputs:
+		ofrReportableEvent WorkflowStep(1..1)
+		reportTrackingNumber string(1..1)
+	output:
+		ofrRpt OfrReport(0..1)
+	
+	alias lastTradeState:
+		ofrReportableEvent
+			extract [item -> businessEvent -> after] then last
+	
+	alias trade:
+		lastTradeState
+			extract item -> trade
+		
+	alias tradeEconomicTerms:
+		trade -> tradableProduct -> product -> contractualProduct -> economicTerms
+	
+	alias reportingCpty:
+		ofrReportableEvent
+			extract [item -> party ] then first
+
+    alias buyerRef:
+        trade -> partyRole
+        filter [item -> role = PartyRoleEnum -> Buyer]
+        then extract [item -> partyReference] then only-element
+
+    alias sellerRef:
+        trade -> partyRole
+        filter [item -> role = PartyRoleEnum -> Seller]
+        then extract [item -> partyReference] then only-element
+
+	alias tradingVenueRef:
+		trade -> partyRole
+		filter [item -> role = PartyRoleEnum -> ExecutionFacility]
+		then extract [item -> partyReference] then only-element
+
+    alias economicTerms:
+        trade -> tradableProduct -> product -> contractualProduct -> economicTerms
+
+    alias collateralAssetPayout:
+        trade->tradableProduct->product->contractualProduct->economicTerms->collateral->collateralPortfolio->collateralPosition->product->contractualProduct->economicTerms->payout->assetPayout first
+
+    alias spread:
+        if (GetRepoRateType( trade -> tradableProduct -> product ) to-string ) = 'FLOAT'
+          then  IntToString(GetFloatingRateIndexSpread(trade))
+        else
+          "0"
+
+    set ofrRpt -> fileObservationDate:
+        ConvertDateToString(trade -> tradeDate)
+
+    set ofrRpt ->coveredReporterLEI:
+        GetPartyLei(reportingCpty)
+
+    set ofrRpt ->cashLenderLEI:
+            GetPartyLei(buyerRef)
+
+    set ofrRpt ->cashLenderName:
+            GetPartyLei(buyerRef)
+
+    set ofrRpt ->cashBorrowerName:
+            GetPartyLei(sellerRef)
+
+    set ofrRpt ->cashBorrowerLEI:
+            GetPartyLei(sellerRef)
+
+    set ofrRpt ->guarantee:
+            GetPartyLei(sellerRef)
+
+    set ofrRpt ->transactionID:
+			trade
+			extract item -> tradeIdentifier
+			then filter [item -> identifierType = TradeIdentifierTypeEnum -> UniqueTransactionIdentifier] then first
+			then extract [item-> assignedIdentifier -> identifier then first]
+
+    set ofrRpt ->uniqueTransactionID:
+			trade
+			extract item -> tradeIdentifier
+			then filter [item -> identifierType = TradeIdentifierTypeEnum -> UniqueTransactionIdentifier] then first
+			then extract [item-> assignedIdentifier -> identifier then first]
+
+    set ofrRpt ->tradingPlatform:
+			if tradingVenueRef exists then
+				GetPartyLei(tradingVenueRef)
+
+    set ofrRpt ->tradeTimestamp:
+			if ofrReportableEvent -> timestamp only-element exists then
+					DateTimeToString(ofrReportableEvent -> timestamp -> dateTime then first)
+
+    set ofrRpt ->startDate:
+            DateToFormatString(GetDateFromAdjustableDate(economicTerms -> effectiveDate -> adjustableDate))
+
+    set ofrRpt ->endDate:
+			DateToFormatString(GetDateFromAdjustableDate(economicTerms -> effectiveDate -> adjustableDate))
+
+    set ofrRpt ->minimumMaturityDate:
+			if (economicTerms -> terminationProvision -> cancelableProvision -> earliestDate exists) then
+				DateToFormatString(economicTerms -> terminationProvision -> cancelableProvision -> earliestDate -> adjustableDate -> adjustedDate)
+
+
+    set ofrRpt ->cashLenderInternalIdentifier:
+            "null"
+
+    set ofrRpt ->cashBorrowerInternalIdentifier:
+            "null"
+
+    set ofrRpt -> startLegAmount:
+            IntToString(GetPurchasePrice(trade))
+
+    set ofrRpt -> closeLegAmount:
+            IntToString(GetRePurchasePrice(trade))
+
+    set ofrRpt -> currentCashAmount:
+            IntToString(GetPurchasePrice(trade))
+
+    set ofrRpt -> startLegCurrency:
+            GetPurchasePriceCurrency(trade)
+
+    set ofrRpt -> rate:
+            GetRepoRate(trade)
+
+    set ofrRpt -> floatingRateBenchmark:
+            "null"
+
+    set ofrRpt -> floatingRateResetFrequency:
+            "null"
+
+    set ofrRpt -> spread:
+            spread
+
+    set ofrRpt -> securitiesIdentifierType:
+            "null"
+
+    set ofrRpt -> securityIdentifier:
+            GetCollateralISIN(collateralAssetPayout)
+
+    set ofrRpt -> securitiesQuantity:
+            "null"
+
+    set ofrRpt -> securitiesValue:
+            "null"
+
+    set ofrRpt -> securitiesValueatInception:
+            "null"
+
+    set ofrRpt -> securitiesValueCurrency:
+            "null"
+
+    set ofrRpt -> haircut:
+            IntToString(GetHairCut(trade->tradableProduct->product))
+
+    set ofrRpt -> specialInstructionsNotesorComments:
+            "null"
+
+
+
+
+	
+func GetPartyLei:
+	inputs:
+		party Party (1..1)
+	output:
+		lei string (1..1)
+	
+	set lei:
+		party
+			extract [item-> partyId]
+			then filter 	[item -> identifierType = PartyIdentifierTypeEnum -> LEI] then first
+			then extract [item-> identifier]
+
+func GetPartyMic:
+	inputs:
+		party Party (1..1)
+	output:
+		mic string (1..1)
+	
+	set mic:
+		party
+			extract [item-> partyId]
+			then filter 	[item -> identifierType = PartyIdentifierTypeEnum -> MIC] then first
+			then extract [item-> identifier]
+			
+
+func GetCountryOfParty:
+	inputs:
+		party Party (1..1)
+	output:
+		country string (1..1)
+	
+	set country:
+		party -> contactInformation -> address -> country only-element then first
+
+
+
+func GetCounterparty:
+    inputs:
+        counterParty Counterparty (2..2)
+    output:
+        party Party (1..1)
+
+    set party:
+        counterParty -> partyReference then last
+
